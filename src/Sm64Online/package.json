@@ -1,0 +1,13 @@
+{
+  "name": "Sm64Online",
+  "version": "1.0.0",
+  "description": "",
+  "main": "Sm64Online.js",
+  "author": "SpiceyWolf, MelonSpeedruns",
+  "credits": "Arthurtilly",
+  "license": "GPL3",
+  "core": "SuperMario64",
+  "dry": {
+    "extends": "./ModLoader64/package-dry.json"
+  }
+}
