@@ -1,11 +1,11 @@
 {
   "name": "Sm64Online",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "",
   "main": "Sm64Online.js",
   "author": "SpiceyWolf, MelonSpeedruns",
   "credits": "Arthurtilly",
   "license": "GPL3",
   "core": "SuperMario64",
-  "updateUrl": "https://raw.githubusercontent.com/hylian-modding/Sm64Online/master/Package/update.json"
+  "updateUrl": "https://raw.githubusercontent.com/hylian-modding/Sm64Online/master/update.json"
 }
