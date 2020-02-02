@@ -14,7 +14,7 @@ import {
 } from 'modloader64_api/NetworkHandler';
 import { InjectCore } from 'modloader64_api/CoreInjection';
 import { Packet } from 'modloader64_api/ModLoaderDefaultImpls';
-import * as API from 'modloader64_api/SM64/Imports';
+import * as API from 'SuperMario64/API/Imports';
 import * as Net from './network/Imports';
 
 export class Sm64Online implements IPlugin {
