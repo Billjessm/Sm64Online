@@ -1,16 +1,16 @@
 import {
-  EventsClient,
-  EventServerJoined,
-  EventServerLeft,
-  EventHandler,
-  EventsServer,
+	EventsClient,
+	EventServerJoined,
+	EventServerLeft,
+	EventHandler,
+	EventsServer,
 } from 'modloader64_api/EventHandler';
 import { IModLoaderAPI, IPlugin } from 'modloader64_api/IModLoaderAPI';
 import {
-  INetworkPlayer,
-  LobbyData,
-  NetworkHandler,
-  ServerNetworkHandler,
+	INetworkPlayer,
+	LobbyData,
+	NetworkHandler,
+	ServerNetworkHandler,
 } from 'modloader64_api/NetworkHandler';
 import { InjectCore } from 'modloader64_api/CoreInjection';
 import { Packet } from 'modloader64_api/ModLoaderDefaultImpls';
@@ -18,269 +18,281 @@ import * as API from 'SuperMario64/API/Imports';
 import * as Net from './network/Imports';
 
 export class Sm64Online implements IPlugin {
-  ModLoader = {} as IModLoaderAPI;
-  name = 'Sm64Online';
+	ModLoader = {} as IModLoaderAPI;
+	name = 'Sm64Online';
 
-  @InjectCore() core!: API.ISM64Core;
+	@InjectCore() core!: API.ISM64Core;
 
-  // Storage Variables
-  cDB = new Net.DatabaseClient();
-  
-  // Helpers
-  protected curScene: number = -1;
+	// Storage Variables
+	cDB = new Net.DatabaseClient();
 
-  handle_scene_change(scene: number) {
-    if (scene === this.curScene) return;
-    
-    // Set global to current scene value
-    this.curScene = scene;
+	// Helpers
+	protected curScene: number = -1;
 
-    this.ModLoader.clientSide.sendPacket(new Net.SyncNumber(this.ModLoader.clientLobby, "SyncScene", scene, true));
-    this.ModLoader.logger.info('Moved to scene[' + scene + '].');
-  }
+	handle_scene_change(scene: number) {
+		if (scene === this.curScene) return;
 
-  handle_save_flags(bufData: Buffer, bufStorage: Buffer, profile: number) {    
-    // Initializers
-    let pData: Net.SyncBuffered;
-    let i: number;
-    let count: number;
-    let needUpdate = false;
+		// Set global to current scene value
+		this.curScene = scene;
 
-    bufData = this.core.save[profile].get_all();
-    bufStorage = this.cDB.save_data;
-    count = bufData.byteLength;
-    needUpdate = false;
+		this.ModLoader.clientSide.sendPacket(new Net.SyncNumber(this.ModLoader.clientLobby, "SyncScene", scene, true));
+		this.ModLoader.logger.info('Moved to scene[' + scene + '].');
+	}
 
-    for (i = 0; i < count; i++) {
-      if (bufData[i] === bufStorage[i]) continue;
-      
-      bufData[i] |= bufStorage[i];
-      this.core.save[profile].set(i, bufData[i]);
-      needUpdate = true;
-    }
-        
-    // Send Changes to Server
-    if (!needUpdate) return; 
-    this.cDB.save_data = bufData;
-    pData = new Net.SyncBuffered(this.ModLoader.clientLobby, 'SyncSaveFile', bufData, false);
-    this.ModLoader.clientSide.sendPacket(pData);   
-  }
+	handle_save_flags(bufData: Buffer, bufStorage: Buffer, profile: number) {
+		// Initializers
+		let pData: Net.SyncBuffered;
+		let i: number;
+		let count: number;
+		let needUpdate = false;
 
-  handle_star_count() {
-    // Initializers
-    let pData: Net.SyncNumber;
-    let val: number;
-    let valDB: number;
-    let needUpdate = false;
+		bufData = this.core.save[profile].get_all();
+		bufStorage = this.cDB.save_data;
+		count = bufData.byteLength;
+		needUpdate = false;
 
-    val = this.core.runtime.star_count;
-    valDB = this.cDB.star_count;
+		for (i = 0; i < count; i++) {
+			if (bufData[i] === bufStorage[i]) continue;
 
-    // Detect Changes
-    if (val === valDB) return;
+			bufData[i] |= bufStorage[i];
+			this.core.save[profile].set(i, bufData[i]);
+			needUpdate = true;
+		}
 
-    // Process Changes
-    if (val > valDB) {
-      this.cDB.star_count = val;
-      needUpdate = true;
-    } else {
-      this.core.runtime.star_count = valDB;
-    }
-    
-    // Send Changes to Server
-    if (!needUpdate) return;    
-    pData = new Net.SyncNumber(this.ModLoader.clientLobby, 'SyncStarCount', val, false);
-    this.ModLoader.clientSide.sendPacket(pData);
-  }
+		// Send Changes to Server
+		if (!needUpdate) return;
+		this.cDB.save_data = bufData;
+		pData = new Net.SyncBuffered(this.ModLoader.clientLobby, 'SyncSaveFile', bufData, false);
+		this.ModLoader.clientSide.sendPacket(pData);
+	}
 
-  constructor() {}
+	handle_star_count() {
+		// Initializers
+		let pData: Net.SyncNumber;
+		let val: number;
+		let valDB: number;
+		let needUpdate = false;
 
-  preinit(): void {}
+		val = this.core.runtime.star_count;
+		valDB = this.cDB.star_count;
 
-  init(): void {}
+		// Detect Changes
+		if (val === valDB) return;
 
-  postinit(): void {}
+		// Process Changes
+		if (val > valDB) {
+			this.cDB.star_count = val;
+			needUpdate = true;
+		} else {
+			this.core.runtime.star_count = valDB;
+		}
 
-  onTick(): void {
-    if (!this.core.mario.exists) return;
+		// Send Changes to Server
+		if (!needUpdate) return;
+		pData = new Net.SyncNumber(this.ModLoader.clientLobby, 'SyncStarCount', val, false);
+		this.ModLoader.clientSide.sendPacket(pData);
+	}
 
-    // Initializers
-    let profile: number = this.core.runtime.get_current_profile();
-    let scene: number = this.core.runtime.get_current_scene();
-    let bufStorage: Buffer;
-    let bufData: Buffer;
-    
-    // General Setup/Handlers
-    this.handle_scene_change(scene);
+	constructor() { }
 
-    // Progress Flags Handlers
-    this.handle_save_flags(bufData!, bufStorage!, profile);
-    this.handle_star_count();
-  }
+	preinit(): void { }
 
-  @EventHandler(EventsClient.ON_INJECT_FINISHED)
-  onClient_InjectFinished(evt: any) {}
+	init(): void { }
 
-  @EventHandler(EventsServer.ON_LOBBY_CREATE)
-  onServer_LobbyCreate(lobby: string) {
-    this.ModLoader.lobbyManager.createLobbyStorage(
-      lobby, 
-      this, 
-      new Net.DatabaseServer()
-    );
-  }
+	postinit(): void { }
 
-  @EventHandler(EventsClient.ON_LOBBY_JOIN)
-  onClient_LobbyJoin(lobby: LobbyData): void {
-    this.cDB = new Net.DatabaseClient();    
-    let pData = new Packet('Request_Storage', 'Sm64Online', this.ModLoader.clientLobby, false);
-    this.ModLoader.clientSide.sendPacket(pData);
-  }
+	onTick(): void {
+		if (!this.core.mario.exists) return;
 
-  @EventHandler(EventsServer.ON_LOBBY_JOIN)
-  onServer_LobbyJoin(evt: EventServerJoined) {
-    let storage: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(evt.lobby, this) as Net.DatabaseServer;
-    
-  }
+		// Initializers
+		let profile: number = this.core.runtime.get_current_profile();
+		let scene: number = this.core.runtime.get_current_scene();
+		let bufStorage: Buffer;
+		let bufData: Buffer;
 
-  @EventHandler(EventsServer.ON_LOBBY_LEAVE)
-  onServer_LobbyLeave(evt: EventServerLeft) {
-    let storage: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(evt.lobby, this) as Net.DatabaseServer;
-    
-  }
+		// General Setup/Handlers
+		this.handle_scene_change(scene);
 
-  @EventHandler(EventsClient.ON_SERVER_CONNECTION)
-  onClient_ServerConnection(evt: any) {
+		// Progress Flags Handlers
+		this.handle_save_flags(bufData!, bufStorage!, profile);
+		this.handle_star_count();
+	}
 
-  }
+	@EventHandler(EventsClient.ON_INJECT_FINISHED)
+	onClient_InjectFinished(evt: any) { }
 
-  @EventHandler(EventsClient.ON_PLAYER_JOIN)
-  onClient_PlayerJoin(nplayer: INetworkPlayer) {}
+	@EventHandler(EventsServer.ON_LOBBY_CREATE)
+	onServer_LobbyCreate(lobby: string) {
+		this.ModLoader.lobbyManager.createLobbyStorage(
+			lobby,
+			this,
+			new Net.DatabaseServer()
+		);
+	}
 
-  @EventHandler(EventsClient.ON_PLAYER_LEAVE)
-  onClient_PlayerLeave(nplayer: INetworkPlayer) {}
+	@EventHandler(EventsClient.ON_LOBBY_JOIN)
+	onClient_LobbyJoin(lobby: LobbyData): void {
+		this.cDB = new Net.DatabaseClient();
+		let pData = new Packet('Request_Storage', 'Sm64Online', this.ModLoader.clientLobby, false);
+		this.ModLoader.clientSide.sendPacket(pData);
+	}
 
-  // #################################################
-  // ##  Server Receive Packets
-  // #################################################
+	@EventHandler(EventsServer.ON_LOBBY_JOIN)
+	onServer_LobbyJoin(evt: EventServerJoined) {
+		let storage: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(evt.lobby, this) as Net.DatabaseServer;
 
-  @ServerNetworkHandler('Request_Storage')
-  onServer_RequestStorage(packet: Packet): void {
-    this.ModLoader.logger.info('[Server] Sending: {Lobby Storage}');
-    let sDB: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(packet.lobby, this) as Net.DatabaseServer;
-    let pData = new Net.SyncStorage(packet.lobby, sDB.save_data, sDB.star_count);
-    this.ModLoader.serverSide.sendPacketToSpecificPlayer(pData, packet.player);
-  }
+	}
 
-  @ServerNetworkHandler('SyncSaveFile')
-  onServer_SyncSaveFile(packet: Net.SyncBuffered) {
-    this.ModLoader.logger.info('[Server] Received: {Save File}');
-    
-    let sDB: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(packet.lobby, this) as Net.DatabaseServer;
-    let data: Buffer = sDB.save_data;
-    let count: number = data.byteLength;
-    let i = 0;
-    let needUpdate = false;
+	@EventHandler(EventsServer.ON_LOBBY_LEAVE)
+	onServer_LobbyLeave(evt: EventServerLeft) {
+		let storage: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(evt.lobby, this) as Net.DatabaseServer;
 
-    for (i = 0; i < count; i++) {
-      if (data[i] === packet.value[i]) continue;
-      data[i] |= packet.value[i];
-      needUpdate = true;
-    }
+	}
 
-    if (!needUpdate) return
+	@EventHandler(EventsClient.ON_SERVER_CONNECTION)
+	onClient_ServerConnection(evt: any) {
 
-    sDB.save_data = data;
+	}
 
-    let pData = new Net.SyncBuffered(packet.lobby, 'SyncSaveFile', data, true);
-    this.ModLoader.serverSide.sendPacket(pData);
+	@EventHandler(EventsClient.ON_PLAYER_JOIN)
+	onClient_PlayerJoin(nplayer: INetworkPlayer) { }
 
-    this.ModLoader.logger.info('[Server] Updated: {Save File}');
-  }
+	@EventHandler(EventsClient.ON_PLAYER_LEAVE)
+	onClient_PlayerLeave(nplayer: INetworkPlayer) { }
 
-  @ServerNetworkHandler('SyncStarCount')
-  onServer_SyncStarCount(packet: Net.SyncNumber) {
-    this.ModLoader.logger.info('[Server] Received: {Star Count}');
-    
-    let sDB: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(packet.lobby, this) as Net.DatabaseServer;
-    let data: number = sDB.star_count;
+	// #################################################
+	// ##  Server Receive Packets
+	// #################################################
 
-    if (data >= packet.value) return;
+	@ServerNetworkHandler('Request_Storage')
+	onServer_RequestStorage(packet: Packet): void {
+		this.ModLoader.logger.info('[Server] Sending: {Lobby Storage}');
+		let sDB: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(packet.lobby, this) as Net.DatabaseServer;
 
-    sDB.star_count = packet.value;
+		// Safety check
+		if (sDB === null) return;
 
-    let pData = new Net.SyncNumber(packet.lobby, 'SyncStarCount', packet.value, true);
-    this.ModLoader.serverSide.sendPacket(pData);
+		let pData = new Net.SyncStorage(packet.lobby, sDB.save_data, sDB.star_count);
+		this.ModLoader.serverSide.sendPacketToSpecificPlayer(pData, packet.player);
+	}
 
-    this.ModLoader.logger.info('[Server] Updated: {Star Count}');
-  }
+	@ServerNetworkHandler('SyncSaveFile')
+	onServer_SyncSaveFile(packet: Net.SyncBuffered) {
+		this.ModLoader.logger.info('[Server] Received: {Save File}');
 
-  @ServerNetworkHandler('SyncScene')
-  onServer_SyncScene(packet: Net.SyncNumber) {
-    let pMsg = 'Player[' + packet.player.nickname + ']';
-    let sMsg = 'Scene[' + packet.value + ']';
-    this.ModLoader.logger.info('[Server] Received: {Player Scene}');
-    this.ModLoader.logger.info('[Server] Updated: ' + pMsg + ' to ' + sMsg);
-  }
+		let sDB: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(packet.lobby, this) as Net.DatabaseServer;
 
-  // #################################################
-  // ##  Client Receive Packets
-  // #################################################
+		// Safety check
+		if (sDB === null) return;
 
-  @NetworkHandler('SyncStorage')
-  onClient_SyncStorage(packet: Net.SyncStorage): void {
-    this.ModLoader.logger.info('[Client] Received: {Lobby Storage}');
-    this.cDB.save_data = packet.save_data;
-    this.cDB.star_count = packet.star_count;
-  }
+		let data: Buffer = sDB.save_data;
+		let count: number = data.byteLength;
+		let i = 0;
+		let needUpdate = false;
 
-  @NetworkHandler('SyncSaveFile')
-  onClient_SyncSaveFile(packet: Net.SyncBuffered) {
-    this.ModLoader.logger.info('[Client] Received: {Save File}');
-    let data: Buffer = this.cDB.save_data;
-    let count: number = data.byteLength;
-    let i = 0;
-    let needUpdate = false;
-    for (i = 0; i < count; i++) {
-      if (data[i] === packet.value[i]) continue;
-      data[i] |= packet.value[i];
-      needUpdate = true;
-    }
-    if (needUpdate) {
-      this.cDB.save_data = data;
-      this.ModLoader.logger.info('[Client] Updated: {Save File}');
-    }
-  }
+		for (i = 0; i < count; i++) {
+			if (data[i] === packet.value[i]) continue;
+			data[i] |= packet.value[i];
+			needUpdate = true;
+		}
 
-  @NetworkHandler('SyncStarCount')
-  onClient_SyncStarCount(packet: Net.SyncNumber) {
-    this.ModLoader.logger.info('[Client] Received: {Star Count}');
+		if (!needUpdate) return
 
-    let data: number = this.cDB.star_count;
+		sDB.save_data = data;
 
-    if (data >= packet.value) return;
+		let pData = new Net.SyncBuffered(packet.lobby, 'SyncSaveFile', data, true);
+		this.ModLoader.serverSide.sendPacket(pData);
 
-    this.cDB.star_count = packet.value;
+		this.ModLoader.logger.info('[Server] Updated: {Save File}');
+	}
 
-    this.ModLoader.logger.info('[Client] Updated: {Star Count}');
-  }
+	@ServerNetworkHandler('SyncStarCount')
+	onServer_SyncStarCount(packet: Net.SyncNumber) {
+		this.ModLoader.logger.info('[Server] Received: {Star Count}');
 
-  @NetworkHandler('Request_Scene')
-  onClient_RequestScene(packet: Packet) {
-    let pData = new Net.SyncNumber(
-      packet.lobby,
-      "SyncScene", 
-      this.core.runtime.get_current_scene(), 
-      false
-    );
-    this.ModLoader.clientSide.sendPacketToSpecificPlayer(pData, packet.player);
-  }
+		let sDB: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(packet.lobby, this) as Net.DatabaseServer;
 
-  @NetworkHandler('SyncScene')
-  onClient_SyncScene(packet: Net.SyncNumber) {
-    let pMsg = 'Player[' + packet.player.nickname + ']';
-    let sMsg = 'Scene[' + packet.value + ']';
-    this.ModLoader.logger.info('[Client] Received: {Player Scene}');
-    this.ModLoader.logger.info('[Client] Updated: ' + pMsg + ' to ' + sMsg);
-  }
+		// Safety check
+		if (sDB === null) return;
+
+		let data: number = sDB.star_count;
+
+		if (data >= packet.value) return;
+
+		sDB.star_count = packet.value;
+
+		let pData = new Net.SyncNumber(packet.lobby, 'SyncStarCount', packet.value, true);
+		this.ModLoader.serverSide.sendPacket(pData);
+
+		this.ModLoader.logger.info('[Server] Updated: {Star Count}');
+	}
+
+	@ServerNetworkHandler('SyncScene')
+	onServer_SyncScene(packet: Net.SyncNumber) {
+		let pMsg = 'Player[' + packet.player.nickname + ']';
+		let sMsg = 'Scene[' + packet.value + ']';
+		this.ModLoader.logger.info('[Server] Received: {Player Scene}');
+		this.ModLoader.logger.info('[Server] Updated: ' + pMsg + ' to ' + sMsg);
+	}
+
+	// #################################################
+	// ##  Client Receive Packets
+	// #################################################
+
+	@NetworkHandler('SyncStorage')
+	onClient_SyncStorage(packet: Net.SyncStorage): void {
+		this.ModLoader.logger.info('[Client] Received: {Lobby Storage}');
+		this.cDB.save_data = packet.save_data;
+		this.cDB.star_count = packet.star_count;
+	}
+
+	@NetworkHandler('SyncSaveFile')
+	onClient_SyncSaveFile(packet: Net.SyncBuffered) {
+		this.ModLoader.logger.info('[Client] Received: {Save File}');
+		let data: Buffer = this.cDB.save_data;
+		let count: number = data.byteLength;
+		let i = 0;
+		let needUpdate = false;
+		for (i = 0; i < count; i++) {
+			if (data[i] === packet.value[i]) continue;
+			data[i] |= packet.value[i];
+			needUpdate = true;
+		}
+		if (needUpdate) {
+			this.cDB.save_data = data;
+			this.ModLoader.logger.info('[Client] Updated: {Save File}');
+		}
+	}
+
+	@NetworkHandler('SyncStarCount')
+	onClient_SyncStarCount(packet: Net.SyncNumber) {
+		this.ModLoader.logger.info('[Client] Received: {Star Count}');
+
+		let data: number = this.cDB.star_count;
+
+		if (data >= packet.value) return;
+
+		this.cDB.star_count = packet.value;
+
+		this.ModLoader.logger.info('[Client] Updated: {Star Count}');
+	}
+
+	@NetworkHandler('Request_Scene')
+	onClient_RequestScene(packet: Packet) {
+		let pData = new Net.SyncNumber(
+			packet.lobby,
+			"SyncScene",
+			this.core.runtime.get_current_scene(),
+			false
+		);
+		this.ModLoader.clientSide.sendPacketToSpecificPlayer(pData, packet.player);
+	}
+
+	@NetworkHandler('SyncScene')
+	onClient_SyncScene(packet: Net.SyncNumber) {
+		let pMsg = 'Player[' + packet.player.nickname + ']';
+		let sMsg = 'Scene[' + packet.value + ']';
+		this.ModLoader.logger.info('[Client] Received: {Player Scene}');
+		this.ModLoader.logger.info('[Client] Updated: ' + pMsg + ' to ' + sMsg);
+	}
 }
