@@ -16,6 +16,7 @@ import { InjectCore } from 'modloader64_api/CoreInjection';
 import { Packet } from 'modloader64_api/ModLoaderDefaultImpls';
 import * as API from 'SuperMario64/API/Imports';
 import * as Net from './network/Imports';
+import * as Puppet from './puppet/Imports';
 
 export class Sm64Online implements IPlugin {
 	ModLoader = {} as IModLoaderAPI;
@@ -25,6 +26,9 @@ export class Sm64Online implements IPlugin {
 
 	// Storage Variables
 	cDB = new Net.DatabaseClient();
+
+	// Puppet Handler
+	protected pMgr!: Puppet.PuppetManager;
 
 	// Helpers
 	protected curScene: number = -1;
@@ -37,6 +41,11 @@ export class Sm64Online implements IPlugin {
 
 		this.ModLoader.clientSide.sendPacket(new Net.SyncNumber(this.ModLoader.clientLobby, "SyncScene", scene, true));
 		this.ModLoader.logger.info('Moved to scene[' + scene + '].');
+	}
+
+	handle_puppets(scene: number) {
+		this.pMgr.scene = scene;
+		this.pMgr.onTick(this.curScene !== -1);
 	}
 
 	handle_save_flags(bufData: Buffer, bufStorage: Buffer, profile: number) {
@@ -95,14 +104,35 @@ export class Sm64Online implements IPlugin {
 
 	constructor() { }
 
-	preinit(): void { }
+	preinit(): void { this.pMgr = new Puppet.PuppetManager(); }
 
-	init(): void { }
+	init(): void { global.ModLoader['SM64:puppet_address'] = 0x370000; }
 
-	postinit(): void { }
+	postinit(): void {
+		this.ModLoader.emulator.rdramWrite32(0x37003C, 0x00000000);
+		this.ModLoader.emulator.rdramWrite32(0x370040, 0x10050000);
+		this.ModLoader.emulator.rdramWrite32(0x370044, 0x11010001);
+		this.ModLoader.emulator.rdramWrite32(0x370048, 0x23000000); //  <-collision cylinder (same size as mario)
+		this.ModLoader.emulator.rdramWrite32(0x37004C, 0x002500A0); //  <-collision cylinder (same size as mario)
+		this.ModLoader.emulator.rdramWrite32(0x370050, 0x08000000);
+		this.ModLoader.emulator.rdramWrite32(0x370054, 0x09000000); // stuff might go in here in future
+
+		// Puppet Manager Inject
+		this.pMgr.postinit(
+			this.ModLoader.emulator,
+			this.core,
+			this.ModLoader.me,
+			this.ModLoader
+		);
+
+		this.ModLoader.logger.info('Puppet manager activated.');
+	}
 
 	onTick(): void {
-		if (!this.core.mario.exists) return;
+		if (!this.core.player.exists) return;
+
+		console.log("CMD: " + this.ModLoader.emulator.rdramRead32(0x370000).toString(16));
+		console.log("ADR: " + this.ModLoader.emulator.rdramRead32(0x370004).toString(16));
 
 		// Initializers
 		let profile: number = this.core.runtime.get_current_profile();
@@ -112,6 +142,7 @@ export class Sm64Online implements IPlugin {
 
 		// General Setup/Handlers
 		this.handle_scene_change(scene);
+		this.handle_puppets(scene);
 
 		// Progress Flags Handlers
 		this.handle_save_flags(bufData!, bufStorage!, profile);
@@ -140,25 +171,34 @@ export class Sm64Online implements IPlugin {
 	@EventHandler(EventsServer.ON_LOBBY_JOIN)
 	onServer_LobbyJoin(evt: EventServerJoined) {
 		let storage: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(evt.lobby, this) as Net.DatabaseServer;
-
+		storage.players[evt.player.uuid] = -1;
+		storage.playerInstances[evt.player.uuid] = evt.player;
 	}
 
 	@EventHandler(EventsServer.ON_LOBBY_LEAVE)
 	onServer_LobbyLeave(evt: EventServerLeft) {
 		let storage: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(evt.lobby, this) as Net.DatabaseServer;
-
+		delete storage.players[evt.player.uuid];
+		delete storage.playerInstances[evt.player.uuid];
 	}
 
 	@EventHandler(EventsClient.ON_SERVER_CONNECTION)
 	onClient_ServerConnection(evt: any) {
-
+		this.pMgr.reset();
+		if (this.core.runtime === undefined || !this.core.player.exists) return;
+		let pData = new Net.SyncNumber(this.ModLoader.clientLobby, "SyncScene", this.curScene, true);
+		this.ModLoader.clientSide.sendPacket(pData);
 	}
 
 	@EventHandler(EventsClient.ON_PLAYER_JOIN)
-	onClient_PlayerJoin(nplayer: INetworkPlayer) { }
+	onClient_PlayerJoin(nplayer: INetworkPlayer) {
+		this.pMgr.registerPuppet(nplayer);
+	}
 
 	@EventHandler(EventsClient.ON_PLAYER_LEAVE)
-	onClient_PlayerLeave(nplayer: INetworkPlayer) { }
+	onClient_PlayerLeave(nplayer: INetworkPlayer) {
+		this.pMgr.unregisterPuppet(nplayer);
+	}
 
 	// #################################################
 	// ##  Server Receive Packets
@@ -229,10 +269,40 @@ export class Sm64Online implements IPlugin {
 
 	@ServerNetworkHandler('SyncScene')
 	onServer_SyncScene(packet: Net.SyncNumber) {
+		let sDB: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(packet.lobby, this) as Net.DatabaseServer;
+
+		// Safety check
+		if (sDB === null) return;
+
 		let pMsg = 'Player[' + packet.player.nickname + ']';
 		let sMsg = 'Scene[' + packet.value + ']';
+		sDB.players[packet.player.uuid] = packet.value;
 		this.ModLoader.logger.info('[Server] Received: {Player Scene}');
 		this.ModLoader.logger.info('[Server] Updated: ' + pMsg + ' to ' + sMsg);
+	}
+
+	@ServerNetworkHandler('SyncPuppet')
+	onServer_SyncPuppet(packet: Net.SyncPuppet) {
+		let sDB: Net.DatabaseServer = this.ModLoader.lobbyManager.getLobbyStorage(packet.lobby, this) as Net.DatabaseServer;
+
+		// Safety check
+		if (sDB === null || sDB.players === null) return
+
+		Object.keys(sDB.players).forEach((key: string) => {
+			if (sDB.players[key] !== sDB.players[packet.player.uuid]) {
+				return;
+			}
+
+			if (!sDB.playerInstances.hasOwnProperty(key)) return;
+			if (sDB.playerInstances[key].uuid === packet.player.uuid) {
+				return;
+			}
+
+			this.ModLoader.serverSide.sendPacketToSpecificPlayer(
+				packet,
+				sDB.playerInstances[key]
+			);
+		});
 	}
 
 	// #################################################
@@ -292,7 +362,13 @@ export class Sm64Online implements IPlugin {
 	onClient_SyncScene(packet: Net.SyncNumber) {
 		let pMsg = 'Player[' + packet.player.nickname + ']';
 		let sMsg = 'Scene[' + packet.value + ']';
+		this.pMgr.changePuppetScene(packet.player, packet.value);
 		this.ModLoader.logger.info('[Client] Received: {Player Scene}');
 		this.ModLoader.logger.info('[Client] Updated: ' + pMsg + ' to ' + sMsg);
+	}
+
+	@NetworkHandler('SyncPuppet')
+	onClient_SyncPuppet(packet: Net.SyncPuppet) {
+		this.pMgr.handlePuppet(packet);
 	}
 }

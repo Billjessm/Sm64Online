@@ -1,4 +1,5 @@
 import { Packet, UDPPacket } from 'modloader64_api/ModLoaderDefaultImpls';
+import * as PData from '../puppet/Instance';
 
 export class SyncStorage extends Packet {
   save_data: Buffer = Buffer.alloc(0x70);
@@ -33,5 +34,17 @@ export class SyncNumber extends Packet {
   constructor(lobby: string, header: string, value: number, persist: boolean) {
     super(header, 'Sm64Online', lobby, persist);
     this.value = value;
+  }
+}
+
+// #################################################
+// ##  Puppet Tracking
+// #################################################
+
+export class SyncPuppet extends UDPPacket {
+  puppet: PData.Data;
+  constructor(lobby: string, value: PData.Data) {
+      super('SyncPuppet', 'Sm64Online', lobby, false);
+      this.puppet = value;
   }
 }

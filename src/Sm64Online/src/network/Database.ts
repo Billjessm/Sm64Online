@@ -5,7 +5,11 @@ export class Database {
 }
 
 // Client only data here
-export class DatabaseClient extends Database {}
+export class DatabaseClient extends Database { }
 
 // Server only data here
-export class DatabaseServer extends Database {}
+export class DatabaseServer extends Database {
+    // Puppets
+    playerInstances: any = {};
+    players: any = {};
+}
