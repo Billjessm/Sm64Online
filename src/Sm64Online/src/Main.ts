@@ -106,17 +106,9 @@ export class Sm64Online implements IPlugin {
 
 	preinit(): void { this.pMgr = new Puppet.PuppetManager(); }
 
-	init(): void { global.ModLoader['SM64:puppet_address'] = 0x370000; }
+	init(): void { }
 
 	postinit(): void {
-		this.ModLoader.emulator.rdramWrite32(0x37003C, 0x00000000);
-		this.ModLoader.emulator.rdramWrite32(0x370040, 0x10050000);
-		this.ModLoader.emulator.rdramWrite32(0x370044, 0x11010001);
-		this.ModLoader.emulator.rdramWrite32(0x370048, 0x23000000); //  <-collision cylinder (same size as mario)
-		this.ModLoader.emulator.rdramWrite32(0x37004C, 0x002500A0); //  <-collision cylinder (same size as mario)
-		this.ModLoader.emulator.rdramWrite32(0x370050, 0x08000000);
-		this.ModLoader.emulator.rdramWrite32(0x370054, 0x09000000); // stuff might go in here in future
-
 		// Puppet Manager Inject
 		this.pMgr.postinit(
 			this.ModLoader.emulator,
@@ -130,9 +122,6 @@ export class Sm64Online implements IPlugin {
 
 	onTick(): void {
 		if (!this.core.player.exists) return;
-
-		console.log("CMD: " + this.ModLoader.emulator.rdramRead32(0x370000).toString(16));
-		console.log("ADR: " + this.ModLoader.emulator.rdramRead32(0x370004).toString(16));
 
 		// Initializers
 		let profile: number = this.core.runtime.get_current_profile();

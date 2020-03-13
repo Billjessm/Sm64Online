@@ -1,12 +1,10 @@
-import { CMD, CommandBuffer } from './Controller';
 import { INetworkPlayer } from 'modloader64_api/NetworkHandler';
 import IMemory from 'modloader64_api/IMemory';
-import uuid from 'uuid';
 import * as API from 'SuperMario64/API/Imports';
 import * as PData from './Instance';
 
 export class Puppet extends API.BaseObj {
-    commandBuffer: CommandBuffer;
+    commandBuffer: API.ICommandBuffer;
     nplayer: INetworkPlayer;
     data: PData.Data;
     id: string;
@@ -22,7 +20,7 @@ export class Puppet extends API.BaseObj {
 
     constructor(
         emu: IMemory,
-        commandBuffer: CommandBuffer,
+        commandBuffer: API.ICommandBuffer,
         nplayer: INetworkPlayer,
         player: API.IPlayer,
         pointer: number,
@@ -32,7 +30,7 @@ export class Puppet extends API.BaseObj {
         this.data = new PData.Data(emu, pointer, player);
         this.commandBuffer = commandBuffer;
         this.nplayer = nplayer;
-        this.id = uuid.v4();
+        this.id = nplayer.uuid;
         this.scene = -1;
         this.index = index;
         this.pointer = pointer;
@@ -60,7 +58,7 @@ export class Puppet extends API.BaseObj {
         }
 
         this.commandBuffer.runCommand(
-            CMD.SPAWN,
+            API.CMD.SPAWN,
             this.index,
             (ptr: number) => {
                 if (ptr === 0x000000) {
@@ -86,7 +84,7 @@ export class Puppet extends API.BaseObj {
         if (!this.isSpawned) return;
 
         this.commandBuffer.runCommand(
-            CMD.DESPAWN,
+            API.CMD.DESPAWN,
             this.index,
             (ptr: number) => {
                 if (ptr !== 0x000000) {

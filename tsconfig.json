@@ -13,6 +13,9 @@
     "moduleResolution": "node",
     "baseUrl": "./",
     "paths": {
+      "@Sm64Online/*": [
+        "./src/Sm64Online/*"
+      ],
       "SuperMario64/*": [
         "libs/SuperMario64/*"
       ]

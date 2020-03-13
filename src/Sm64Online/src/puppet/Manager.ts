@@ -1,4 +1,3 @@
-import { CommandBuffer } from './Controller';
 import { dummy } from './Dummy';
 import { IModLoaderAPI } from 'modloader64_api/IModLoaderAPI';
 import { INetworkPlayer } from 'modloader64_api/NetworkHandler';
@@ -12,7 +11,6 @@ export class PuppetManager {
     private emu!: IMemory;
     private core!: API.ISM64Core;
     private mapi!: IModLoaderAPI;
-    private commandBuffer!: CommandBuffer;
     private puppetArray: Puppet[] = [];
     private playerToPuppetMap: Map<string, number> = new Map<string, number>();
     private emptyPuppetSlot: number[] = new Array<number>();
@@ -33,21 +31,20 @@ export class PuppetManager {
         this.emu = emu;
         this.core = core;
         this.mapi = mapi;
-        this.commandBuffer = new CommandBuffer(this.emu);
         this.dummy = new Puppet(
             this.emu,
-            this.commandBuffer,
+            core.commandBuffer,
             nplayer,
             core.player,
             0x0,
             -1
         );
-        let addr = global.ModLoader['SM64:puppet_address'];
+        let addr = 0x803004;
         let offset: number;
         for (let i = 0; i < 16; i++) {
-            offset = addr + i * 0x08 + 0x04;
+            offset = addr + i * 0x08;
             this.puppetArray.push(
-                new Puppet(emu, this.commandBuffer, dummy, this.core.player, offset, i)
+                new Puppet(emu, core.commandBuffer, dummy, this.core.player, offset, i)
             );
             this.emptyPuppetSlot.push(i);
         }
@@ -180,11 +177,11 @@ export class PuppetManager {
             this.playerToPuppetMap.get(packet.player.uuid)!
         ];
         if (!puppet.canHandle) return;
+
         puppet.handleInstance(packet.puppet);
     }
 
     onTick(isSafe: boolean) {
-        this.commandBuffer.onTick();
         this.handleNewPlayers();
         if (isSafe) {
             this.handleAwaitingSpawns();

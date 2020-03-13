@@ -12,6 +12,8 @@ export class Data extends API.BaseObj implements Data {
         this.pointer = pointer;
         this.player = player;
         // this.copyFields.push('anim');
+        this.copyFields.push('col');
+        this.copyFields.push('yoff');
         this.copyFields.push('pos');
         this.copyFields.push('rot');
     }
@@ -25,9 +27,7 @@ export class Data extends API.BaseObj implements Data {
             this.broken = true;
             return ret;
         }
-
-        console.log("PLAYER PTR == " + ptr.toString(16));
-
+        
         // if (this.emulator.rdramRead32(ptr + 0x1c) !== 0xdeadbeef) {
         //     console.log('info:    [DEADBEEF] Saved the day!');
         //     this.broken = true;
@@ -55,6 +55,26 @@ export class Data extends API.BaseObj implements Data {
 
         this.emulator.rdramWritePtr32(ptr, 0x14, frame);
         this.emulator.rdramWritePtr32(ptr, 0x10, id);
+    }
+
+    get col(): number {
+        return 0;
+    }
+    set col(val: number) {
+        let ptr: number = this.safetyCheck();
+        if (ptr === 0x000000) return;
+
+        this.emulator.rdramWritePtr32(this.pointer, 0x134, 0x00000000);
+    }
+
+    get yoff(): number {
+        return 0;
+    }
+    set yoff(val: number) {
+        let ptr: number = this.safetyCheck();
+        if (ptr === 0x000000) return;
+
+        this.emulator.rdramWritePtr32(this.pointer, 0xDC, 0x42280000);
     }
 
     get pos(): Buffer {
