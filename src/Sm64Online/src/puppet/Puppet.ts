@@ -27,7 +27,7 @@ export class Puppet extends API.BaseObj {
         index: number
     ) {
         super(emu);
-        this.data = new PData.Data(emu, pointer, player);
+        this.data = new PData.Data(emu, pointer, player, index);
         this.commandBuffer = commandBuffer;
         this.nplayer = nplayer;
         this.id = nplayer.uuid;
@@ -66,8 +66,7 @@ export class Puppet extends API.BaseObj {
                     return;
                 }
 
-                // let DEADBEEF: Buffer = Buffer.from('DEADBEEF', 'hex');
-                // this.emulator.rdramWriteBuffer(ptr + 0x1c, DEADBEEF);
+                this.emulator.rdramWrite32(ptr + 0x0184, 0xDEADBEEF);
                 this.isSpawned = true;
                 this.canHandle = true;
 

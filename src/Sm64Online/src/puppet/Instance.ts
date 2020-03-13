@@ -5,13 +5,15 @@ export class Data extends API.BaseObj implements Data {
     private readonly copyFields: string[] = new Array<string>();
     player: API.IPlayer;
     pointer: number;
+    index: number;
     broken: boolean = false;
 
-    constructor(emu: IMemory, pointer: number, player: API.IPlayer) {
+    constructor(emu: IMemory, pointer: number, player: API.IPlayer, index: number) {
         super(emu);
         this.pointer = pointer;
         this.player = player;
-        // this.copyFields.push('anim');
+        this.index = index;
+        this.copyFields.push('anim');
         this.copyFields.push('col');
         this.copyFields.push('yoff');
         this.copyFields.push('pos');
@@ -22,17 +24,12 @@ export class Data extends API.BaseObj implements Data {
         let ret = 0x000000;
         if (this.broken) return ret;
 
-        let ptr: number = this.emulator.dereferencePointer(this.pointer);
-        if (ptr === 0x000000) {
+        let ptr: number = this.emulator.dereferencePointer(this.pointer);        
+        if (this.emulator.rdramRead32(ptr + 0x0184) !== 0xDEADBEEF) {
+            console.log('info:    [DEADBEEF] Saved the day!');
             this.broken = true;
             return ret;
         }
-        
-        // if (this.emulator.rdramRead32(ptr + 0x1c) !== 0xdeadbeef) {
-        //     console.log('info:    [DEADBEEF] Saved the day!');
-        //     this.broken = true;
-        //     return ret;
-        // }
 
         return ptr;
     }
@@ -44,17 +41,15 @@ export class Data extends API.BaseObj implements Data {
         let ptr: number = this.safetyCheck();
         if (ptr === 0x000000) return;
 
-        ptr = this.emulator.dereferencePointer(ptr + 0x14);
-        if (ptr === 0x000000) {
-            this.broken = true;
-            return;
-        }
+        // Set anim pointer
+        let anim_ptr = 0x804000 + this.index * 0x4000;
+        this.emulator.rdramWrite32(ptr + 0x3C, 0x80000000 + anim_ptr);
 
-        let frame: number = val.readUInt32BE(0);
-        let id: number = val.readUInt32BE(4);
-
-        this.emulator.rdramWritePtr32(ptr, 0x14, frame);
-        this.emulator.rdramWritePtr32(ptr, 0x10, id);
+        // Set anim buffer
+        val.writeUInt32BE(val.readUInt32BE(0x0C) + anim_ptr, 0x0C);
+        val.writeUInt32BE(val.readUInt32BE(0x10) + anim_ptr, 0x10);
+        this.emulator.rdramWriteBuffer(anim_ptr, val.slice(0, val.length - 2));
+        this.emulator.rdramWrite16(ptr + 0x40, val.readUInt16BE(val.length - 2));
     }
 
     get col(): number {
@@ -64,7 +59,7 @@ export class Data extends API.BaseObj implements Data {
         let ptr: number = this.safetyCheck();
         if (ptr === 0x000000) return;
 
-        this.emulator.rdramWritePtr32(this.pointer, 0x134, 0x00000000);
+        this.emulator.rdramWrite32(ptr + 0x134, 0x00000000);
     }
 
     get yoff(): number {
@@ -74,7 +69,7 @@ export class Data extends API.BaseObj implements Data {
         let ptr: number = this.safetyCheck();
         if (ptr === 0x000000) return;
 
-        this.emulator.rdramWritePtr32(this.pointer, 0xDC, 0x42280000);
+        this.emulator.rdramWrite16(ptr + 0x3A, 0xBD);
     }
 
     get pos(): Buffer {
@@ -84,7 +79,7 @@ export class Data extends API.BaseObj implements Data {
         let ptr: number = this.safetyCheck();
         if (ptr === 0x000000) return;
 
-        this.emulator.rdramWritePtrBuffer(this.pointer, 0xA0, val);
+        this.emulator.rdramWriteBuffer(ptr + 0xA0, val);
     }
 
     get rot(): Buffer {
@@ -94,7 +89,7 @@ export class Data extends API.BaseObj implements Data {
         let ptr: number = this.safetyCheck();
         if (ptr === 0x000000) return;
 
-        this.emulator.rdramWritePtrBuffer(this.pointer, 0xD0, val);
+        this.emulator.rdramWriteBuffer(ptr + 0xD0, val);
     }
 
     toJSON() {
