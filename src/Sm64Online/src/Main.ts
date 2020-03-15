@@ -35,12 +35,6 @@ export class Sm64Online implements IPlugin {
 	protected isPaused: boolean = false;
 	protected isVisible: boolean = false;
 
-	handle_pause_change(paused: boolean) {
-		if (paused === this.isPaused) return;
-		this.core.player.translucency = paused ? 0x80 : 0xFF;
-		this.isPaused = paused;
-	}
-
 	handle_scene_change(scene: number) {
 		if (scene === this.curScene) {
 			if (this.isVisible !== this.core.player.visible) {
@@ -157,7 +151,6 @@ export class Sm64Online implements IPlugin {
 		let bufData: Buffer;
 
 		// General Setup/Handlers
-		this.handle_pause_change(paused);
 		this.handle_scene_change(scene);
 		this.handle_puppets(scene);
 
