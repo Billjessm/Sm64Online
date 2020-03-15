@@ -32,12 +32,38 @@ export class Sm64Online implements IPlugin {
 
 	// Helpers
 	protected curScene: number = -1;
+	protected isPaused: boolean = false;
+	protected isVisible: boolean = false;
+
+	handle_pause_change(paused: boolean) {
+		if (paused === this.isPaused) return;
+		this.core.player.translucency = paused ? 0x80 : 0xFF;
+		this.isPaused = paused;
+	}
 
 	handle_scene_change(scene: number) {
-		if (scene === this.curScene) return;
+		if (scene === this.curScene) {
+			if (this.isVisible !== this.core.player.visible) {
+				this.isVisible = this.core.player.visible;
+
+				if (this.isVisible) {
+					this.ModLoader.clientSide.sendPacket(
+						new Net.SyncNumber(this.ModLoader.clientLobby, "SyncScene", scene, true)
+					); this.ModLoader.logger.info('Moved to scene[' + scene + '].');
+				} else {
+					this.ModLoader.clientSide.sendPacket(
+						new Net.SyncNumber(this.ModLoader.clientLobby, "SyncScene", 0xff, true)
+					); this.ModLoader.logger.info('Unloaded the scene.');
+				}
+			}
+			return;
+		}
 
 		// Set global to current scene value
 		this.curScene = scene;
+
+		// Only send data if we are visible
+		if (!this.isVisible) return;
 
 		this.ModLoader.clientSide.sendPacket(new Net.SyncNumber(this.ModLoader.clientLobby, "SyncScene", scene, true));
 		this.ModLoader.logger.info('Moved to scene[' + scene + '].');
@@ -45,7 +71,7 @@ export class Sm64Online implements IPlugin {
 
 	handle_puppets(scene: number) {
 		this.pMgr.scene = scene;
-		this.pMgr.onTick(this.curScene !== -1);
+		this.pMgr.onTick(this.curScene !== -1 && this.isVisible);
 	}
 
 	handle_save_flags(bufData: Buffer, bufStorage: Buffer, profile: number) {
@@ -124,12 +150,14 @@ export class Sm64Online implements IPlugin {
 		if (!this.core.player.exists) return;
 
 		// Initializers
+		let paused: boolean = this.core.runtime.get_is_paused();
 		let profile: number = this.core.runtime.get_current_profile();
 		let scene: number = this.core.runtime.get_current_scene();
 		let bufStorage: Buffer;
 		let bufData: Buffer;
 
 		// General Setup/Handlers
+		this.handle_pause_change(paused);
 		this.handle_scene_change(scene);
 		this.handle_puppets(scene);
 

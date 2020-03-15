@@ -169,6 +169,8 @@ export class PuppetManager {
     }
 
     handlePuppet(packet: Net.SyncPuppet) {
+        if (this.core.runtime.get_is_paused()) return;
+        
         if (!this.playerToPuppetMap.has(packet.player.uuid)) {
             this.registerPuppet(packet.player);
             return;
