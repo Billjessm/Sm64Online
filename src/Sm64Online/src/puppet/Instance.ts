@@ -13,14 +13,11 @@ export class Data extends API.BaseObj implements Data {
         this.pointer = pointer;
         this.player = player;
         this.index = index;
-        this.copyFields.push('anim');
-        this.copyFields.push('fnim');
         this.copyFields.push('col');
         this.copyFields.push('yoff');
         this.copyFields.push('pos');
         this.copyFields.push('rot');
-        this.copyFields.push('tlc');
-        //this.copyFields.push('vis');
+        this.copyFields.push('vis');
     }
 
     safetyCheck(): number {
@@ -29,7 +26,6 @@ export class Data extends API.BaseObj implements Data {
 
         let ptr: number = this.emulator.dereferencePointer(this.pointer);        
         if (this.emulator.rdramRead32(ptr + 0x0184) !== 0xDEADBEEF) {
-            console.log('info:    [DEADBEEF] Saved the day!');
             this.broken = true;
             return ret;
         }
@@ -38,30 +34,9 @@ export class Data extends API.BaseObj implements Data {
     }
 
     get anim(): Buffer {
-        return this.player.animation;
+        return Buffer.alloc(0);
     }
     set anim(val: Buffer) {
-        let ptr: number = this.safetyCheck();
-        if (ptr === 0x000000) return;
-
-        // Set anim pointer
-        let anim_ptr = 0x804000 + this.index * 0x4000;
-        this.emulator.rdramWrite32(ptr + 0x3C, 0x80000000 + anim_ptr);
-
-        // Set anim buffer
-        val.writeUInt32BE(val.readUInt32BE(0x0C) + anim_ptr, 0x0C);
-        val.writeUInt32BE(val.readUInt32BE(0x10) + anim_ptr, 0x10);
-        this.emulator.rdramWriteBuffer(anim_ptr, val);
-    }
-
-    get fnim(): Buffer {
-        return this.player.animation_frame;
-    }
-    set fnim(val: Buffer) {
-        let ptr: number = this.safetyCheck();
-        if (ptr === 0x000000) return;
-
-        this.emulator.rdramWriteBuffer(ptr + 0x40, val);
     }
 
     get col(): number {
@@ -71,6 +46,7 @@ export class Data extends API.BaseObj implements Data {
         let ptr: number = this.safetyCheck();
         if (ptr === 0x000000) return;
 
+        // Writes collision handled to 0 after every frame
         this.emulator.rdramWrite32(ptr + 0x134, 0x00000000);
     }
 
@@ -81,6 +57,7 @@ export class Data extends API.BaseObj implements Data {
         let ptr: number = this.safetyCheck();
         if (ptr === 0x000000) return;
 
+        // Marks marios height (in case sinking in sand)
         this.emulator.rdramWrite16(ptr + 0x3A, 0xBD);
     }
 
@@ -102,16 +79,6 @@ export class Data extends API.BaseObj implements Data {
         if (ptr === 0x000000) return;
 
         this.emulator.rdramWriteBuffer(ptr + 0xD0, val);
-    }
-
-    get tlc(): number {
-        return this.player.translucency;
-    }
-    set tlc(val: number) {
-        let ptr: number = this.safetyCheck();
-        if (ptr === 0x000000) return;
-
-        this.emulator.rdramWrite32(ptr + 0x17C, val);
     }
 
     get vis(): boolean {
