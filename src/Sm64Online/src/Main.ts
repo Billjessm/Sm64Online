@@ -159,6 +159,8 @@ export class Sm64Online implements IPlugin {
 		this.handle_star_count();
 	}
 
+	getServerURL(): string { return "192.99.70.23:8020"; }
+
 	@EventHandler(EventsClient.ON_INJECT_FINISHED)
 	onClient_InjectFinished(evt: any) { }
 
